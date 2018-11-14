@@ -5,6 +5,7 @@ import (
 	"io"
 	"log"
 	"net"
+	"sync"
 
 	"github.com/FlowerWrong/shadowsocks-go/socks"
 	ssUtil "github.com/FlowerWrong/shadowsocks-go/util"
@@ -31,6 +32,7 @@ func handleConnection(conn net.Conn, shadow func(net.Conn) net.Conn, ss string) 
 		log.Println(err)
 		return
 	}
+	defer remoteConn.Close()
 	remoteConn = shadow(remoteConn)
 
 	// https://shadowsocks.org/en/spec/Protocol.html
@@ -49,16 +51,18 @@ func handleConnection(conn net.Conn, shadow func(net.Conn) net.Conn, ss string) 
 
 // Serve ...
 func Serve(serverURLs util.ArrayFlags) {
-	wgw := new(util.WaitGroupWrapper)
+	var wg sync.WaitGroup
 
-	for _, ss := range serverURLs {
-		host, method, password, localPort, err := ssUtil.ParseSSURL(ss)
-		if err != nil {
-			log.Fatal(err)
-		}
+	for i, ss := range serverURLs {
+		wg.Add(1)
+		go func(i int, ss string) {
+			defer wg.Done()
+			host, method, password, localPort, err := ssUtil.ParseSSURL(ss)
+			if err != nil {
+				log.Fatal(err)
+			}
 
-		wgw.Wrap(func() {
-			ciph, err := core.PickCipher(method, []byte{}, password)
+			cipher, err := core.PickCipher(method, []byte{}, password)
 			if err != nil {
 				log.Fatal(err)
 			}
@@ -67,16 +71,17 @@ func Serve(serverURLs util.ArrayFlags) {
 			if err != nil {
 				log.Fatalln(err)
 			}
+			log.Printf("ss server %d start on %s", i, ln.Addr().String())
 			for {
 				conn, err := ln.Accept()
 				if err != nil {
 					log.Println("Accept failed", err)
 					continue
 				}
-				go handleConnection(conn, ciph.StreamConn, host)
+				go handleConnection(conn, cipher.StreamConn, host)
 			}
-		})
+		}(i, ss)
 	}
 
-	wgw.WaitGroup.Wait()
+	wg.Wait()
 }
