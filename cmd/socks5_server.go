@@ -6,7 +6,6 @@ import (
 	"math/rand"
 	"net"
 	"runtime"
-	"strconv"
 	"time"
 
 	"github.com/FlowerWrong/shadowsocks-go/socks"
@@ -25,15 +24,9 @@ func handleConnection(conn net.Conn) {
 		log.Println(err)
 		return
 	}
-	log.Println(socks5Req)
 
-	port := strconv.Itoa(socks5Req.DstPort)
-	var host string
-	if socks5Req.Atype == socks.ATYPEIPv4 || socks5Req.Atype == socks.ATYPEIPv6 {
-		host = net.IP(socks5Req.DstAddr[:]).String()
-	} else if socks5Req.Atype == socks.ATYPEDOMAIN {
-		host = string(socks5Req.DstAddr[:])
-	}
+	host, port := socks.HostPort(socks5Req)
+	log.Printf("proxy %s <-> %s", conn.RemoteAddr(), net.JoinHostPort(host, port))
 
 	remoteConn, err := net.Dial("tcp", net.JoinHostPort(host, port))
 	if err != nil {
@@ -44,12 +37,13 @@ func handleConnection(conn net.Conn) {
 	io.Copy(conn, remoteConn)
 }
 
+// curl -v --socks5-hostname 127.0.0.1:2090 baidu.com
 func main() {
 	rand.Seed(time.Now().UnixNano())
 	log.SetFlags(log.LstdFlags | log.Lshortfile)
 	runtime.GOMAXPROCS(runtime.NumCPU())
 
-	ln, err := net.Listen("tcp", ":1090")
+	ln, err := net.Listen("tcp", ":2090")
 	if err != nil {
 		log.Fatalln(err)
 	}
