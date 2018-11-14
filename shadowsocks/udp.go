@@ -17,6 +17,7 @@ import (
 const MAXUDPPACKETSIZE = 65507
 
 func readFromRemoteWriteToLocal(remotePC, localPC net.PacketConn, localAddr net.Addr) {
+	defer remotePC.Close()
 	remoteBuf := make([]byte, MAXUDPPACKETSIZE)
 	for {
 		// The reassembly timer MUST be no less than 5 seconds?
@@ -80,7 +81,6 @@ func ServeUDP(serverURLs util.ArrayFlags) {
 					log.Println(err)
 					continue
 				}
-				defer remotePC.Close()
 				remotePC = cipher.PacketConn(remotePC)
 
 				socks5Req := socks.ParseUDPRequest(buf[:n])
