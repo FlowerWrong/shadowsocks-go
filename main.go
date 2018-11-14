@@ -22,5 +22,13 @@ func main() {
 	var serverURLs util.ArrayFlags
 	flag.Var(&serverURLs, "server", "ss server URL")
 	flag.Parse()
-	shadowsocks.Serve(serverURLs)
+
+	wgw := new(util.WaitGroupWrapper)
+	wgw.Wrap(func() {
+		shadowsocks.ServeTCP(serverURLs)
+	})
+	wgw.Wrap(func() {
+		shadowsocks.ServeUDP(serverURLs)
+	})
+	wgw.WaitGroup.Wait()
 }

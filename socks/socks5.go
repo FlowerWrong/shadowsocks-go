@@ -4,9 +4,10 @@ package socks
 import (
 	"errors"
 	"io"
-	"log"
 	"net"
 	"strconv"
+
+	socks5 "github.com/shadowsocks/go-shadowsocks2/socks"
 )
 
 const maxLen = 1 + 1 + 255
@@ -35,6 +36,34 @@ type Request struct {
 	DstAddr []byte
 	DstPort int
 	Tgt     []byte
+}
+
+// ParseUDPRequest ... See https://www.ietf.org/rfc/rfc1928.txt
+func ParseUDPRequest(buf []byte) *Request {
+	// +----+------+------+----------+----------+----------+
+	// |RSV | FRAG | ATYP | DST.ADDR | DST.PORT |   DATA   |
+	// +----+------+------+----------+----------+----------+
+	// | 2  |  1   |  1   | Variable |    2     | Variable |
+	// +----+------+------+----------+----------+----------+
+	atype := buf[3]
+	req := &Request{Cmd: CMDUDP, Atype: atype}
+	req.Tgt = []byte{atype}
+	if atype == ATYPEIPv4 {
+		req.DstAddr = buf[4 : 4+net.IPv4len]
+		req.DstPort = int(buf[4+net.IPv4len])<<8 | int(buf[4+net.IPv4len+1])
+		req.Tgt = append(req.Tgt, buf[4:4+net.IPv4len+2]...)
+	} else if atype == ATYPEDOMAIN {
+		req.Tgt = append(req.Tgt, buf[5])
+		domainLen := buf[5]
+		req.DstAddr = buf[5 : 5+domainLen]
+		req.DstPort = int(buf[5+domainLen])<<8 | int(buf[5+domainLen+1])
+		req.Tgt = append(req.Tgt, buf[5:5+domainLen+2]...)
+	} else if atype == ATYPEIPv6 {
+		req.DstAddr = buf[4 : 4+net.IPv6len]
+		req.DstPort = int(buf[4+net.IPv6len])<<8 | int(buf[4+net.IPv6len+1])
+		req.Tgt = append(req.Tgt, buf[4:4+net.IPv6len+2]...)
+	}
+	return req
 }
 
 // HostPort ...
@@ -97,7 +126,6 @@ func HandleRequest(rw io.ReadWriter) (*Request, error) {
 	req.Tgt = []byte{atype}
 
 	if atype == ATYPEIPv4 {
-		log.Println("This is a IPv4 request")
 		_, err = io.ReadFull(rw, buf[:net.IPv4len+2])
 		if err != nil {
 			return nil, err
@@ -106,7 +134,6 @@ func HandleRequest(rw io.ReadWriter) (*Request, error) {
 		req.DstPort = int(buf[net.IPv4len])<<8 | int(buf[net.IPv4len+1])
 		req.Tgt = append(req.Tgt, buf[:net.IPv4len+2]...)
 	} else if atype == ATYPEDOMAIN {
-		log.Println("This is a domain request")
 		_, err = io.ReadFull(rw, buf[:1])
 		if err != nil {
 			return nil, err
@@ -121,7 +148,6 @@ func HandleRequest(rw io.ReadWriter) (*Request, error) {
 		req.DstPort = int(buf[domainLen])<<8 | int(buf[domainLen+1])
 		req.Tgt = append(req.Tgt, buf[:domainLen+2]...)
 	} else if atype == ATYPEIPv6 {
-		log.Println("This is a IPv6 request")
 		_, err = io.ReadFull(rw, buf[:net.IPv6len+2])
 		if err != nil {
 			return nil, err
@@ -134,15 +160,20 @@ func HandleRequest(rw io.ReadWriter) (*Request, error) {
 	}
 
 	if cmd == CMDCONNECT {
-		log.Println("This is a connect request")
 		// connect will ignore BND.ADDR and BND.PORT
 		_, err = rw.Write([]byte{VER, 0x00, 0x00, 0x01, 0, 0, 0, 0, 0, 0})
 		if err != nil {
 			return nil, err
 		}
 	} else if cmd == CMDUDP {
-		log.Println("This is a udp request")
-		// TODO UDP support
+		// In the reply to a UDP ASSOCIATE request, the BND.PORT and BND.ADDR
+		// fields indicate the port number/address where the client MUST send
+		// UDP request messages to be relayed. @see https://www.ietf.org/rfc/rfc1928.txt
+		listenAddr := socks5.ParseAddr(rw.(net.Conn).LocalAddr().String())
+		_, err = rw.Write(append([]byte{VER, 0x00, 0x00}, listenAddr...))
+		if err != nil {
+			return nil, err
+		}
 	} else {
 		return nil, errors.New("only support connect and udp")
 	}

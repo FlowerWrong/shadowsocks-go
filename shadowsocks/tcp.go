@@ -13,6 +13,9 @@ import (
 	"github.com/shadowsocks/go-shadowsocks2/core"
 )
 
+// MTU ...
+const MTU = 1500
+
 func handleConnection(conn net.Conn, shadow func(net.Conn) net.Conn, ss string) {
 	defer conn.Close()
 
@@ -25,6 +28,21 @@ func handleConnection(conn net.Conn, shadow func(net.Conn) net.Conn, ss string) 
 	if err != nil {
 		log.Println(err)
 		return
+	}
+
+	// UDP
+	if socks5Req.Cmd == socks.CMDUDP {
+		var buf [MTU]byte
+		// block until close
+		for {
+			_, err = conn.Read(buf[:])
+			if err != nil {
+				if !util.IsEOF(err) && !util.IsTimeout(err) {
+					log.Println(err)
+				}
+				return
+			}
+		}
 	}
 
 	remoteConn, err := net.Dial("tcp", ss)
@@ -49,8 +67,8 @@ func handleConnection(conn net.Conn, shadow func(net.Conn) net.Conn, ss string) 
 	io.Copy(conn, remoteConn)
 }
 
-// Serve ...
-func Serve(serverURLs util.ArrayFlags) {
+// ServeTCP ...
+func ServeTCP(serverURLs util.ArrayFlags) {
 	var wg sync.WaitGroup
 
 	for i, ss := range serverURLs {
@@ -71,7 +89,7 @@ func Serve(serverURLs util.ArrayFlags) {
 			if err != nil {
 				log.Fatalln(err)
 			}
-			log.Printf("ss server %d start on %s", i, ln.Addr().String())
+			log.Printf("ss TCP server %d start on %s", i, ln.Addr().String())
 			for {
 				conn, err := ln.Accept()
 				if err != nil {
