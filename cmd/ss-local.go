@@ -13,7 +13,7 @@ import (
 
 // curl -v --socks5-hostname 127.0.0.1:1080 baidu.com
 // ss://method:password@hostname:port?local_port=1080
-// go run main.go --server '' --server ''
+// go run ss-local.go --server '' --server ''
 func main() {
 	rand.Seed(time.Now().UnixNano())
 	log.SetFlags(log.LstdFlags | log.Lshortfile)

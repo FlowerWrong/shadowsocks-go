@@ -11,6 +11,7 @@ import (
 	ssUtil "github.com/FlowerWrong/shadowsocks-go/util"
 	"github.com/FlowerWrong/util"
 	"github.com/shadowsocks/go-shadowsocks2/core"
+	socks5 "github.com/shadowsocks/go-shadowsocks2/socks"
 )
 
 // MTU ...
@@ -67,7 +68,7 @@ func handleConnection(conn net.Conn, shadow func(net.Conn) net.Conn, ss string) 
 	io.Copy(conn, remoteConn)
 }
 
-// ServeTCP ...
+// ServeTCP  is for ss-local
 func ServeTCP(serverURLs util.ArrayFlags) {
 	var wg sync.WaitGroup
 
@@ -97,6 +98,64 @@ func ServeTCP(serverURLs util.ArrayFlags) {
 					continue
 				}
 				go handleConnection(conn, cipher.StreamConn, host)
+			}
+		}(i, ss)
+	}
+
+	wg.Wait()
+}
+
+// ServeRemoteTCP  is for ss-server
+func ServeRemoteTCP(serverURLs util.ArrayFlags) {
+	var wg sync.WaitGroup
+
+	for i, ss := range serverURLs {
+		wg.Add(1)
+		go func(i int, ss string) {
+			defer wg.Done()
+			host, method, password, _, err := ssUtil.ParseSSURL(ss)
+			if err != nil {
+				log.Fatal(err)
+			}
+
+			cipher, err := core.PickCipher(method, []byte{}, password)
+			if err != nil {
+				log.Fatal(err)
+			}
+
+			ln, err := net.Listen("tcp", host)
+			if err != nil {
+				log.Fatalln(err)
+			}
+			log.Printf("ss TCP server %d start on %s", i, ln.Addr().String())
+			for {
+				conn, err := ln.Accept()
+				if err != nil {
+					log.Println("Accept failed", err)
+					continue
+				}
+				go func() {
+					defer conn.Close()
+					conn = cipher.StreamConn(conn)
+
+					tgt, err := socks5.ReadAddr(conn)
+					if err != nil {
+						log.Println(err)
+						return
+					}
+
+					remoteConn, err := net.Dial("tcp", tgt.String())
+					if err != nil {
+						log.Println(err)
+						return
+					}
+					defer remoteConn.Close()
+
+					log.Printf("proxy %s <-> %s", conn.RemoteAddr(), tgt)
+
+					go io.Copy(remoteConn, conn)
+					io.Copy(conn, remoteConn)
+				}()
 			}
 		}(i, ss)
 	}
