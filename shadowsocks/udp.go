@@ -154,7 +154,7 @@ func ServeRemoteUDP(serverURLs util.ArrayFlags) {
 					continue
 				}
 
-				socks5Req := socks.ParseUDPRequest(buf[3:n])
+				socks5Req := socks.ParseUDPRequest(append([]byte{0, 0, 0}, buf[:n]...))
 				targetHost, targetPort := socks.HostPort(socks5Req)
 				log.Printf("proxy %s <-> %s <-> %s", remoteAddr, host, net.JoinHostPort(targetHost, targetPort))
 				go func() {
