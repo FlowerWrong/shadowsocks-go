@@ -31,6 +31,11 @@ func readFromRemoteWriteToLocal(remotePC, localPC net.PacketConn, localAddr net.
 			break
 		}
 
+		// +----+------+------+----------+----------+----------+
+		// |RSV | FRAG | ATYP | DST.ADDR | DST.PORT |   DATA   |
+		// +----+------+------+----------+----------+----------+
+		// | 2  |  1   |  1   | Variable |    2     | Variable |
+		// +----+------+------+----------+----------+----------+
 		_, err = localPC.WriteTo(append([]byte{0, 0, 0}, remoteBuf[:m]...), localAddr)
 		if err != nil {
 			log.Println(err)
@@ -88,6 +93,12 @@ func ServeUDP(serverURLs util.ArrayFlags) {
 				targetHost, targetPort := socks.HostPort(socks5Req)
 				log.Printf("proxy %s <-> %s <-> %s", remoteAddr, host, net.JoinHostPort(targetHost, targetPort))
 				go readFromRemoteWriteToLocal(remotePC, localPC, remoteAddr)
+
+				// +------+----------+----------+----------+
+				// | ATYP | DST.ADDR | DST.PORT |   DATA   |
+				// +------+----------+----------+----------+
+				// |  1   | Variable |    2     | Variable |
+				// +------+----------+----------+----------+
 				_, err = remotePC.WriteTo(buf[3:n], ssAddr)
 				if err != nil {
 					log.Println(err)
@@ -128,6 +139,11 @@ func ServeRemoteUDP(serverURLs util.ArrayFlags) {
 
 			buf := make([]byte, MAXUDPPACKETSIZE)
 			for {
+				// +------+----------+----------+----------+
+				// | ATYP | DST.ADDR | DST.PORT |   DATA   |
+				// +------+----------+----------+----------+
+				// |  1   | Variable |    2     | Variable |
+				// +------+----------+----------+----------+
 				n, remoteAddr, err := localPC.ReadFrom(buf)
 				if err != nil {
 					log.Println(err)
