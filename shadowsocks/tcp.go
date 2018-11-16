@@ -31,7 +31,8 @@ func handleConnection(conn net.Conn, shadow func(net.Conn) net.Conn, ss string) 
 		return
 	}
 
-	// UDP
+	// 如果是UDP请求，那么这里tcp连接不能关闭，tcp和udp在socks5里面是一一对应的关系
+	// tcp断了，那么代理通道就断了
 	if socks5Req.Cmd == socks.CMDUDP {
 		var buf [MTU]byte
 		// block until close
@@ -64,6 +65,7 @@ func handleConnection(conn net.Conn, shadow func(net.Conn) net.Conn, ss string) 
 	host, port := socks.HostPort(socks5Req)
 	log.Printf("proxy %s <-> %s <-> %s", conn.RemoteAddr(), ss, net.JoinHostPort(host, port))
 
+	// 对倒数据
 	go io.Copy(remoteConn, conn)
 	io.Copy(conn, remoteConn)
 }
@@ -97,6 +99,8 @@ func ServeTCP(serverURLs util.ArrayFlags) {
 					log.Println("Accept failed", err)
 					continue
 				}
+
+				// cipher.StreamConn 可以想象成安全层和应用层的关系，类似http + tls
 				go handleConnection(conn, cipher.StreamConn, host)
 			}
 		}(i, ss)
@@ -136,6 +140,7 @@ func ServeRemoteTCP(serverURLs util.ArrayFlags) {
 				}
 				go func() {
 					defer conn.Close()
+					// cipher.StreamConn 可以想象成安全层和应用层的关系，类似http + tls
 					conn = cipher.StreamConn(conn)
 
 					tgt, err := socks5.ReadAddr(conn)
@@ -153,6 +158,7 @@ func ServeRemoteTCP(serverURLs util.ArrayFlags) {
 
 					log.Printf("proxy %s <-> %s", conn.RemoteAddr(), tgt)
 
+					// 对倒数据
 					go io.Copy(remoteConn, conn)
 					io.Copy(conn, remoteConn)
 				}()

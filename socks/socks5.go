@@ -38,7 +38,7 @@ type Request struct {
 	Tgt     []byte
 }
 
-// ParseUDPRequest ... See https://www.ietf.org/rfc/rfc1928.txt
+// ParseUDPRequest 从数据包里面解析出Request See https://www.ietf.org/rfc/rfc1928.txt
 func ParseUDPRequest(buf []byte) *Request {
 	// +----+------+------+----------+----------+----------+
 	// |RSV | FRAG | ATYP | DST.ADDR | DST.PORT |   DATA   |
@@ -66,7 +66,7 @@ func ParseUDPRequest(buf []byte) *Request {
 	return req
 }
 
-// HostPort ...
+// HostPort 从Request解析出DST.ADDR and DST.PORT string
 func HostPort(socks5Req *Request) (host, port string) {
 	port = strconv.Itoa(socks5Req.DstPort)
 	if socks5Req.Atype == ATYPEIPv4 || socks5Req.Atype == ATYPEIPv6 {
@@ -77,7 +77,7 @@ func HostPort(socks5Req *Request) (host, port string) {
 	return
 }
 
-// HandleConnectAndAuth ...
+// HandleConnectAndAuth 连接认证阶段
 func HandleConnectAndAuth(rw io.ReadWriter) error {
 	var buf [maxLen]byte
 	// VER NMETHODS
@@ -105,7 +105,7 @@ func HandleConnectAndAuth(rw io.ReadWriter) error {
 	return nil
 }
 
-// HandleRequest ...
+// HandleRequest 请求阶段
 func HandleRequest(rw io.ReadWriter) (*Request, error) {
 	var buf [maxLen]byte
 	// VER CMD RSV ATYP

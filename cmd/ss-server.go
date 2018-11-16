@@ -22,11 +22,14 @@ func main() {
 	flag.Var(&serverURLs, "server", "ss server URL")
 	flag.Parse()
 
+	// See https://golang.org/pkg/sync/#WaitGroup
 	wgw := new(util.WaitGroupWrapper)
 	wgw.Wrap(func() {
+		// 处理tcp连接，其实就是一个socks 5 proxy server
 		shadowsocks.ServeRemoteTCP(serverURLs)
 	})
 	wgw.Wrap(func() {
+		// 处理udp连接，其实就是一个socks 5 proxy server
 		shadowsocks.ServeRemoteUDP(serverURLs)
 	})
 	wgw.WaitGroup.Wait()

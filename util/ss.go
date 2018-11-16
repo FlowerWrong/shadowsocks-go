@@ -4,7 +4,7 @@ import (
 	"net/url"
 )
 
-// ParseSSURL ...
+// ParseSSURL 解析url格式的shadowsocks配置数据
 func ParseSSURL(ss string) (host, method, password, localPort string, err error) {
 	u, err := url.Parse(ss)
 	if err != nil {

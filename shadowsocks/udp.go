@@ -17,6 +17,10 @@ import (
 // MAXUDPPACKETSIZE ...
 const MAXUDPPACKETSIZE = 65507
 
+// 由于udp没有连接的概念，这里只是从远端读取，然后写会本地
+// 在tcp里面类似
+// go io.Copy(src, dst)
+// go io.Copy(dst, src)
 func readFromRemoteWriteToLocal(remotePC, localPC net.PacketConn, localAddr net.Addr) {
 	defer remotePC.Close()
 	remoteBuf := make([]byte, MAXUDPPACKETSIZE)
@@ -87,6 +91,8 @@ func ServeUDP(serverURLs util.ArrayFlags) {
 					log.Println(err)
 					continue
 				}
+
+				// 可以想象成安全层和应用层的关系，类似http + tls
 				remotePC = cipher.PacketConn(remotePC)
 
 				socks5Req := socks.ParseUDPRequest(buf[:n])
@@ -134,6 +140,8 @@ func ServeRemoteUDP(serverURLs util.ArrayFlags) {
 				log.Fatal(err)
 			}
 			defer localPC.Close()
+
+			// 可以想象成安全层和应用层的关系，类似http + tls
 			localPC = cipher.PacketConn(localPC)
 			log.Printf("ss UDP server %d start on %s", i, localPC.LocalAddr().String())
 
