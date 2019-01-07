@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"io"
 	"log"
 	"math/rand"
@@ -8,6 +9,7 @@ import (
 	"runtime"
 	"time"
 
+	"github.com/FlowerWrong/shadowsocks-go/shadowsocks"
 	"github.com/FlowerWrong/shadowsocks-go/socks"
 )
 
@@ -31,7 +33,8 @@ func handleConnection(conn net.Conn) {
 	host, port := socks.HostPort(socks5Req)
 	log.Printf("proxy %s <-> %s", conn.RemoteAddr(), net.JoinHostPort(host, port))
 
-	remoteConn, err := net.Dial("tcp", net.JoinHostPort(host, port))
+	d := net.Dialer{Control: shadowsocks.SetSocketOptions}
+	remoteConn, err := d.Dial("tcp", net.JoinHostPort(host, port))
 	if err != nil {
 		log.Println(err)
 		return
@@ -49,7 +52,8 @@ func main() {
 	log.SetFlags(log.LstdFlags | log.Lshortfile)
 	runtime.GOMAXPROCS(runtime.NumCPU())
 
-	ln, err := net.Listen("tcp", ":2090")
+	lc := net.ListenConfig{Control: shadowsocks.SetSocketOptions}
+	ln, err := lc.Listen(context.Background(), "tcp", ":2090")
 	if err != nil {
 		log.Fatalln(err)
 	}

@@ -1,6 +1,7 @@
 package shadowsocks
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"net"
@@ -71,7 +72,8 @@ func ServeUDP(serverURLs util.ArrayFlags) {
 				log.Fatal(err)
 			}
 
-			localPC, err := net.ListenPacket("udp", fmt.Sprintf(":%s", localPort))
+			lc := net.ListenConfig{Control: SetSocketOptions}
+			localPC, err := lc.ListenPacket(context.Background(), "udp", fmt.Sprintf(":%s", localPort))
 			if err != nil {
 				log.Fatal(err)
 			}
@@ -135,7 +137,8 @@ func ServeRemoteUDP(serverURLs util.ArrayFlags) {
 				log.Fatal(err)
 			}
 
-			localPC, err := net.ListenPacket("udp", host)
+			lc := net.ListenConfig{Control: SetSocketOptions}
+			localPC, err := lc.ListenPacket(context.Background(), "udp", host)
 			if err != nil {
 				log.Fatal(err)
 			}

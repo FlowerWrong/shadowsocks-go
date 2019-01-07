@@ -1,6 +1,7 @@
 package shadowsocks
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"log"
@@ -88,7 +89,8 @@ func ServeTCP(serverURLs util.ArrayFlags) {
 				log.Fatal(err)
 			}
 
-			ln, err := net.Listen("tcp", fmt.Sprintf(":%s", localPort))
+			lc := net.ListenConfig{Control: SetSocketOptions}
+			ln, err := lc.Listen(context.Background(), "tcp", fmt.Sprintf(":%s", localPort))
 			if err != nil {
 				log.Fatalln(err)
 			}
@@ -127,7 +129,8 @@ func ServeRemoteTCP(serverURLs util.ArrayFlags) {
 				log.Fatal(err)
 			}
 
-			ln, err := net.Listen("tcp", host)
+			lc := net.ListenConfig{Control: SetSocketOptions}
+			ln, err := lc.Listen(context.Background(), "tcp", host)
 			if err != nil {
 				log.Fatalln(err)
 			}
